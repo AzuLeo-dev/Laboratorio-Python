@@ -1,0 +1,450 @@
+ACCION SistemaBiblioteca_CORRECCION ES
+
+AMBIENTE
+    Constante
+        MULTA_DIA = 500;
+    
+    Variables
+        ing_dni: N(8);
+        ing_id: N(5);
+        encontrado: Booleano;
+        opcion2: entero;
+
+    Usuario = REGISTRO
+        dni: N(8);
+        AyN: AN(50);
+        celular: N(15);
+    FIN_REGISTRO
+
+    Libro = REGISTRO
+        id: N(5);
+        titulo: AN(50);
+        disponible: Booleano;
+        cant_solicitada: entero;
+    FIN_REGISTRO
+
+    Prestamo = REGISTRO
+        id_libro: N(5);
+        dni: N(8);
+        fecha_vencimiento, fecha_entrega: fecha;
+    FIN_REGISTRO
+
+    Fecha = REGISTRO
+     aa: N(4);
+     mm: N(1...12);
+     dd: N(1...31);
+    FIN_REGISTRO
+
+    ArchivoUsuarios: Archivo de Usuario;
+    ArchivoLibros: Archivo de Libro;
+    ArchivoPrestamos: Archivo de Prestamo;
+    opcion: entero;
+    regL: Libro
+    regP: Prestamo
+    regF: Fecha
+    regU: Usuario
+
+    {--------------------------------------}
+    SUBACCION ConvertirADias(f: fecha): entero ES
+    PROCESO
+        {Simplificación: año de 360 días, mes de 30 días}
+        ConvertirADias := (f.aa * 360) + (f.mm * 30) + f.dd;
+    FIN_SUBACCION
+
+    SUBACCION EsPosterior(fecha_entrega, fecha_vencimiento: fecha): Booleano ES
+    PROCESO
+        Si fecha_entrega.aa <> fecha_vencimiento.aa entonces
+            EsPosterior := fecha_entrega.aa > fecha_vencimiento.aa;
+        Sino
+            Si fecha_entrega.mm <> fecha_vencimiento.mm entonces
+                EsPosterior := fecha_entrega.mm > fecha_vencimiento.mm;
+            Sino
+                EsPosterior := fecha_entrega.dd > fecha_vencimiento.dd;
+            FinSi
+        FinSi
+    FIN_SUBACCION
+
+    SUBACCION EsPosterior(fecha_entrega, fecha_vencimiento: fecha): Booleano ES
+    PROCESO
+        Si fecha_entrega.aa <> fecha_vencimiento.aa entonces
+            EsPosterior := fecha_entrega.aa > fecha_vencimiento.aa;
+        Sino
+            Si fecha_entrega.mm <> fecha_vencimiento.mm entonces
+                EsPosterior := fecha_entrega.mm > fecha_vencimiento.mm;
+            Sino
+                EsPosterior := fecha_entrega.dd > fecha_vencimiento.dd;
+            FinSi
+        FinSi
+    FIN_SUBACCION
+
+    SUBACCION CalcularMulta(vencimiento, entrega: fecha): entero ES
+    AMBIENTE
+        dias: entero;
+    PROCESO
+        Si EsPosterior(entrega, vencimiento) entonces
+            dias := ConvertirADias(entrega) - ConvertirADias(vencimiento);
+            CalcularMulta := dias * MULTA_DIA;
+        Sino
+            CalcularMulta := 0;
+        FinSi
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION ExisteUsuario(dni_buscar: N): Booleano ES
+    PROCESO
+        ExisteUsuario := Falso;
+        Abrir E(ArchivoUsuarios);
+        Leer(ArchivoUsuarios, regU);
+        Mientras NFDA(ArchivoUsuarios) Y NO ExisteUsuario Hacer
+            Si regU.dni = dni_buscar entonces
+                ExisteUsuario := Verdadero;
+            FinSi
+            Leer(ArchivoUsuarios, regU);
+        Fin_Mientras
+        Cerrar(ArchivoUsuarios);
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION ExisteLibro(id_buscar: N): Booleano ES
+    PROCESO
+        ExisteLibro := Falso;
+        Abrir E(ArchivoLibros);
+        Leer(ArchivoLibros, regL);
+        Mientras NFDA(ArchivoLibros) Y NO ExisteLibro Hacer
+            Si regL.id = id_buscar entonces
+                ExisteLibro := Verdadero;
+            FinSi
+            Leer(ArchivoLibros, regL);
+        FinMientras
+        Cerrar(ArchivoLibros);
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION RegistrarUsuario ES
+    AMBIENTE
+        regU: Usuario;
+    PROCESO
+        Esc("DNI: "); Leer(regU.dni);
+        Esc("Apellido: "); Leer(regU.apellido);
+        Esc("Nombre: "); Leer(regU.nombre);
+        Esc("Celular: "); Leer(regU.celular);
+        Abrir A(ArchivoUsuarios); {Abrir para agregar}
+        Escribir(ArchivoUsuarios, regU);
+        Cerrar(ArchivoUsuarios);
+        Esc("Usuario registrado correctamente.");
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION CargarLibro ES
+    AMBIENTE
+        regL: Libro;
+        id_ingresado: N(5);
+    PROCESO
+        Esc("ID del libro: "); Leer(id_ingresado);
+        Si ExisteLibro(id_ingresado) entonces
+            Esc("Ese libro ya existe.");
+        Sino
+            regL.id := id_ingresado;
+            Esc(" Ingrese el Título: ");
+            Leer(regL.titulo);
+            regL.disponible := Verdadero;
+            regL.cant_solicitada := 0;
+            Abrir A(ArchivoLibros);
+            Escribir(ArchivoLibros, regL);
+            Cerrar(ArchivoLibros);
+            Esc("Libro agregado correctamente.");
+        FinSi
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION MostrarLibros ES
+    AMBIENTE
+        regL: Libro;
+        estado: AN(15);
+    PROCESO
+        Esc("LIBROS");
+        Abrir E(ArchivoLibros);
+        Leer(ArchivoLibros, regL);
+        Mientras NFDA(ArchivoLibros) Hacer
+            Si regL.disponible entonces
+                estado := "Disponible";
+            Sino
+                estado := "Prestado";
+            FinSi
+            Esc(regL.id, " " regL.titulo, " " estado, " " "Cantidad de veces que se solicito el libro:", regL.cant_solicitada);
+            Leer(ArchivoLibros, regL);
+        FinMientras
+        Cerrar(ArchivoLibros);
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION PrestarLibro ES
+    PROCESO
+        Esc("DNI del usuario: "); Leer(ing_dni);
+        Si NO ExisteUsuario(ing_dni) entonces
+            Esc("El usuario no está registrado.");
+        Sino
+            Esc("ID del libro: ");
+            Leer(ing_id);
+            encontrado := Falso;
+            prestado := Falso;
+            Abrir E/M(ArchivoLibros); {lectura/modificación de cada registro}
+            Leer(ArchivoLibros, regL);
+            Mientras NFDA(ArchivoLibros) y no encontrado Hacer
+                Si regL.id = ing_id entonces
+                    encontrado := Verdadero;
+                FinSi
+                Si regL.disponible entonces
+                    regL.disponible := Falso;
+                    regL.cant_solicitada := regL.cant_solicitada + 1;
+                    prestado := Verdadero;
+                    Regrabar (ArchivoLibros, regL);
+                Sino
+                    Esc("El libro no esta disponible.");
+                FinSi
+                Leer(ArchivoLibros, regL);
+            Fin_Mientras
+            Cerrar (ArchivoLibros);
+            Si NO encontrado entonces
+                Esc("No existe un libro con ese ID.");
+            Sino
+                Si prestado entonces
+                    Esc("Fecha de vencimiento (AAAAMMDD): ");
+                    Leer(regP.fecha_vencimiento.aa);
+                    Leer(regP.fecha_vencimiento.mm);
+                    Leer(regP.fecha_vencimiento.dd);
+                    regP.id_libro := regL.id;
+                    regP.dni := ing_dni;
+                    regP.fecha_entrega.aa:=0;
+                    regP.fecha_entrega.aa:=0;
+                    regP.fecha_entrega.aa:=0;
+                    Abrir A(ArchivoPrestamos);
+                    grabar(ArchivoPrestamos, regP);
+                    Cerrar(ArchivoPrestamos);
+                    Esc("Préstamo registrado correctamente.");
+                Fin_Si
+            Fin_Si
+        Fin_Si
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION DevolverLibro ES
+    AMBIENTE
+        multa: entero;
+    PROCESO
+        Abrir E/M(ArchivoPrestamos);
+        Leer(ArchivoPrestamos, regP);
+        Esc("DNI del usuario: "); Leer(ing_dni);
+        Esc("ID del libro: "); Leer(ing_id);
+        Esc("Fecha de entrega (AAAAMMDD): ");
+        Leer(fecha.aa);
+        Leer(fecha.mm);
+        Leer(fecha.dd);
+        encontrado := Falso;
+        multa := 0;
+        Mientras NFDA(ArchivoPrestamos) y no encontrado Hacer
+            Si regP.id_libro = ing_id Y regP.dni = ing_dni
+                encontrado := Verdadero;
+                multa := CalcularMulta(regP.fecha_vencimiento, fecha);
+                regP.fecha_entrega := fecha;
+                Modificar(ArchivoPrestamos, regP);
+            FinSi
+            Leer(ArchivoPrestamos, regP);
+        FinMientras
+        Cerrar(ArchivoPrestamos);
+        Si NO encontrado entonces
+            Esc("No existe ese préstamo.");
+        Sino
+            Abrir E/M(ArchivoLibros);
+            Leer(ArchivoLibros, regL);
+            encontrado:= Falso;
+            Mientras NFDA(ArchivoLibros) y no encontrado Hacer
+                Si regL.id = ing_id entonces
+                    regL.disponible := Verdadero;
+                    encontrado:= verdadero;
+                    Modificar(ArchivoLibros, regL);
+                Fin_Si
+                Leer(ArchivoLibros, regL);
+            Fin_Mientras
+            Cerrar (ArchivoLibros);
+            Esc("Libro devuelto correctamente.");
+            Si multa > 0 entonces
+                Esc("Multa: $", multa);
+            Sino
+                Esc("Sin multa.");
+            Fin_Si
+        Fin_Si
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION Estadisticas_generales ES
+    AMBIENTE
+        mayor, total: entero;
+        libro_mas_pedido: AN(50);
+    PROCESO
+        mayor := -1;
+        total := 0;
+        libro_mas_pedido := "";
+        Abrir E(ArchivoLibros);
+        Leer(ArchivoLibros, regL);
+        Mientras NFDA(ArchivoLibros) Hacer
+            total := total + regL.cant_solicitada;
+            Si regL.cant_solicitada > mayor entonces
+                mayor := regL.cant_solicitada;
+                libro_mas_pedido := regL.titulo;
+            FinSi
+            Leer(ArchivoLibros, regL);
+        Fin_Mientras
+        Cerrar(ArchivoLibros);
+        Esc("Libro más solicitado:", libro_mas_pedido);
+        Esc("Cantidad de préstamos que tuvo el libro fue de :", mayor " prestamos.");
+        Esc("Total de préstamos registrados:", total);
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION lector_mes ES
+    AMBIENTE
+        cont: N(2);
+        mes: N(2);
+        nombre: AN(50);
+    PROCESO 
+        Escribir("Ingrese su nombre y apellido:");
+        Leer(nombre);
+        Escribir("Ingrese el dni del usuario.");
+        Leer(ing_dni);
+        Escribir("Ingrese un mes 1...12");
+        Leer(mes);
+        cont:=0;
+        Abrir E/ (ArchivoPrestamos);
+        Leer(ArchivoPrestamos,regP);
+        Mientras NFDA (ArchivoPrestamos) Hacer 
+            Si regP.dni= ing_dni y regP.fecha_entrega.mm= mes entonces
+                cont:=cont+1;
+            Fin_Si 
+        Leer(ArchivoPrestamos,regP);
+        Fin_Mientras
+        Escribir("La cantidad de libros que leyó " nombre " en el mes " mes " es de: " cont);
+        Cerrar(ArchivoPrestamos);
+    FIN_SUBACCION
+
+    {--------------------------------------}
+    SUBACCION lector_año ES
+    AMBIENTE
+      cont: N(2);
+      año: N(4);
+      nombre: AN(50);
+    PROCESO 
+        Escribir("Ingrese su nombre y apellido:");
+        Leer(nombre);
+        Escribir("Ingrese el dni del usuario.");
+        Leer(ing_dni);
+        Escribir("Ingrese un año.");
+        Leer(año)v
+        cont:=0;
+        Abrir E/ (ArchivoPrestamos);
+        Leer(ArchivoPrestamos,regP);
+        Mientras NFDA (ArchivoPrestamos) Hacer 
+            Si regP.dni= ing_dni y regP.fecha_entrega.aa= año entonces
+                cont:=cont+1;
+            Fin_Si
+            Leer(ArchivoPrestamos,regP);
+        Fin_Mientras
+        Escribir("La cantidad de libros que leyó " nombre " en el año " año " es de: " cont);
+        Cerrar(ArchivoPrestamos);
+    Fin_Subacción
+
+    {--------------------------------------}
+    SUBACCION Libros_mes ES
+    AMBIENTE
+        titulo2: AN(50);
+        mes: N(2);
+        cont: entero;
+    PROCESO
+        Escribir("Ingrese el titulo del libro.");
+        Leer(titulo2);
+        Escribir("Ingrese el id del libro.");
+        Leer(ing_id);
+        Escribir("Ingrese mes.");
+        Leer (mes);
+        Abrir E/ (ArchivoPrestamos);
+        Leer(ArchivoPrestamos,regP);
+        cont:=0;
+        Mientras NFDA(ArchivoPrestamos) Hacer
+            Si regP.id_libro = ing_id y  regP.fecha_entrega.mm= mes entonces 
+                cont:= cont+1;
+            Fin_Si
+            Leer(ArchivoPrestamos,regP);
+        Fin_Mientras
+        Escribir("El libro" titulo2 " fue pedido un total de: " cont " veces en el mes: " mes);
+        Cerrar(ArchivoPrestamos);
+    FIN_SUBACCION
+  
+    
+    {--------------------------------------}
+    SUBACCION Libros_año ES
+    AMBIENTE
+        titulo2: AN(50);
+        año: N (4);
+        cont: entero;
+    PROCESO
+        Escribir("Ingrese el titulo del libro.");
+        Leer(titulo2);
+        Escribir("Ingrese el id del libro.");
+        Leer(ing_id);
+        Escribir("Ingrese año.");
+        Leer (año);
+        Abrir E/ (ArchivoPrestamos);
+        Leer(ArchivoPrestamos,regP);
+        cont:=0;
+        Mientras NFDA(ArchivoPrestamos) Hacer
+            Si regP.id_libro = ing_id y  regP.fecha_entrega.aa= año entonces 
+                cont:= cont+1;
+            Fin_Si
+            Leer(ArchivoPrestamos,regP);
+        Fin_Mientras
+        Escribir("El libro" titulo2 " fue pedido un total de: " cont " veces en el año: " año);
+        Cerrar(ArchivoPrestamos);
+    FIN_SUBACCION
+
+PROCESO
+    Repetir
+        Esc("1 Registrar usuario");
+        Esc("2 Cargar libro");
+        Esc("3 Mostrar libros");
+        Esc("4 Prestar libro");
+        Esc("5 Devolver libro");
+        Esc("6 Estadísticas");
+        Esc("0 Salir");
+        Leer(opcion);
+
+        Segun opcion Hacer
+            1:  RegistrarUsuario();
+            2:  CargarLibro();
+            3:  MostrarLibros();
+            4:  PrestarLibro();
+            5:  DevolverLibro();
+            6:  Repetir
+                   Escribir("¿Qué estadisticas quiere ver?);
+                   Escribir("1: Estadisticas generales.");
+                   Escribir("2: Libros mas pedidos del mes que elijas.");
+                   Escribir("3:El libro mas pedido del año que elijas.");
+                   Escribir ("4:Cuantos libros pediste en el mes que elijas.");
+                   Escribir("5:Cuantos libros pediste el año que elijas.");
+                   Escribir("0:Salir");
+                   Leer(opcion2);
+                
+                    Segun opcion2 Hacer
+                        1: Estadisticas_generales();
+                        2: Libros_mes();
+                        3: Libros_año();
+                        4: lector_mes();
+                        5: lector_año();
+                        otro: Escribir("Error opción no válida, ingrese otro valor");
+                    FIN_SEGUN
+                Hasta que opcion2 = 0
+            0:  Esc("Fin del programa.");
+            Otro: Esc("Opción no válida, ingrese un valor de los escritos en pantalla.");
+        Fin_Segun
+
+    Hasta que opcion = 0;
+FIN_ACCION
